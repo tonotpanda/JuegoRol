@@ -1,18 +1,33 @@
 package forms;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class Juego {
     private JPanel panelMain;
     private JLabel messageLabel;
     private JPanel dungeonPanel;
 
+    private String selectedRole;
+    private String playerName;
+
     private static final String WARRIOR_IMAGE = "src/images/warrior/warriorPic.png";
     private static final String WIZARD_IMAGE = "src/images/wizard/wizardPic.png";
     private static final String PRIEST_IMAGE = "src/images/priest/priestPic.png";
     private static final String TILE_WALL = "src/images/dungeon/tile001.png";
     private static final String TILE_FLOOR = "src/images/dungeon/tile004.png";
+    private static final String DOLLAR_ICON = "src/images/dungeon/dollar.png";
+    private static final String HEART_ICON = "src/images/dungeon/heart.png";
+    private static final String MITRA_ICON = "src/images/dungeon/mitra.png";
+    private static final String POTION_ICON = "src/images/dungeon/potion.png";
+    private static final String SWORD_ICON = "src/images/dungeon/sword.png";
 
     public Juego() {
         panelMain = new JPanel(new BorderLayout());
@@ -63,6 +78,8 @@ public class Juego {
     }
 
     private void handleCharacterSelection(String role) {
+        this.selectedRole = role;
+
         messageLabel.setText("Has elegido: " + role);
 
         String name = JOptionPane.showInputDialog(panelMain,
@@ -71,6 +88,7 @@ public class Juego {
                 JOptionPane.PLAIN_MESSAGE);
 
         if (name != null && !name.trim().isEmpty()) {
+            this.playerName = name;
             messageLabel.setText("Personaje: " + name + " (" + role + ")");
             panelMain.removeAll();
             panelMain.revalidate();
@@ -82,23 +100,15 @@ public class Juego {
     }
 
     private void loadDungeon() {
-        Dimension panelSize = panelMain.getSize();
         int numRows = 10, numCols = 10;
-
-        int tileWidth = panelSize.width / numCols;
-        int tileHeight = panelSize.height / numRows;
-
         dungeonPanel = new JPanel(new GridLayout(numRows, numCols, 0, 0));
         dungeonPanel.setBackground(Color.BLACK);
 
+        int tileWidth = 1000 / numCols;
+        int tileHeight = 800 / numRows;
+
         ImageIcon wallIcon = new ImageIcon(TILE_WALL);
         ImageIcon floorIcon = new ImageIcon(TILE_FLOOR);
-
-        if (wallIcon.getIconWidth() == -1 || floorIcon.getIconWidth() == -1) {
-            System.err.println("Error al cargar las imágenes.");
-            return;
-        }
-
         Image scaledWallImage = wallIcon.getImage().getScaledInstance(tileWidth, tileHeight, Image.SCALE_SMOOTH);
         Image scaledFloorImage = floorIcon.getImage().getScaledInstance(tileWidth, tileHeight, Image.SCALE_SMOOTH);
 
@@ -112,6 +122,8 @@ public class Juego {
                 ImageIcon icon = isBorder ? new ImageIcon(scaledWallImage) : new ImageIcon(scaledFloorImage);
                 tileLabel.setIcon(icon);
 
+                tileLabel.putClientProperty("type", isBorder ? "wall" : "floor");
+
                 dungeonPanel.add(tileLabel);
             }
         }
@@ -119,6 +131,82 @@ public class Juego {
         panelMain.add(dungeonPanel, BorderLayout.CENTER);
         panelMain.revalidate();
         panelMain.repaint();
+
+        loadItemsMap(numRows, numCols);
+    }
+
+    private void loadItemsMap(int numRows, int numCols) {
+        List<Point> floorTiles = new ArrayList<>();
+
+        for (int row = 1; row < numRows - 1; row++) {
+            for (int col = 1; col < numCols - 1; col++) {
+                JLabel tileLabel = (JLabel) dungeonPanel.getComponent(row * numCols + col);
+                if ("floor".equals(tileLabel.getClientProperty("type"))) {
+                    floorTiles.add(new Point(row, col));
+                }
+            }
+        }
+
+        Collections.shuffle(floorTiles);
+
+        if (selectedRole.equals("Guerrero") && !floorTiles.isEmpty()) {
+            placeItemOnTile(floorTiles.remove(0), SWORD_ICON);
+        } else if (selectedRole.equals("Mago") && !floorTiles.isEmpty()) {
+            placeItemOnTile(floorTiles.remove(0), POTION_ICON);
+        } else if (selectedRole.equals("Curandero") && !floorTiles.isEmpty()) {
+            placeItemOnTile(floorTiles.remove(0), MITRA_ICON);
+        }
+
+        if (!floorTiles.isEmpty()) placeItemOnTile(floorTiles.remove(0), DOLLAR_ICON);
+        if (!floorTiles.isEmpty()) placeItemOnTile(floorTiles.remove(0), HEART_ICON);
+    }
+
+    private void placeItemOnTile(Point position, String itemIconPath) {
+        try {
+            int row = position.x;
+            int col = position.y;
+            int index = row * 10 + col;
+            JLabel tileLabel = (JLabel) dungeonPanel.getComponent(index);
+
+            // Cargar imágenes con ImageIO (más confiable que ImageIcon)
+            BufferedImage floorImage = ImageIO.read(new File(TILE_FLOOR));
+            BufferedImage itemImage = ImageIO.read(new File(itemIconPath));
+
+            // Obtener dimensiones del tile
+            int width = tileLabel.getWidth() > 0 ? tileLabel.getWidth() : 100;
+            int height = tileLabel.getHeight() > 0 ? tileLabel.getHeight() : 80;
+
+            // Escalar imágenes
+            Image scaledFloor = floorImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+            int itemSize = Math.min(width, height) / 2;
+            Image scaledItem = itemImage.getScaledInstance(itemSize, itemSize, Image.SCALE_SMOOTH);
+
+            // Crear imagen combinada
+            BufferedImage combined = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = combined.createGraphics();
+
+            // Configurar renderizado de alta calidad
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+
+            // Dibujar el piso
+            g.drawImage(scaledFloor, 0, 0, null);
+
+            // Dibujar el ítem centrado
+            int x = (width - itemSize) / 2;
+            int y = (height - itemSize) / 2;
+            g.drawImage(scaledItem, x, y, null);
+
+            g.dispose();
+
+            // Actualizar el icono del tile
+            tileLabel.setIcon(new ImageIcon(combined));
+
+        } catch (IOException e) {
+            System.err.println("Error al cargar imágenes: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
