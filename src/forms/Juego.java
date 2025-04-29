@@ -3,6 +3,7 @@ package forms;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -342,49 +343,68 @@ public class Juego {
     }
 
     private void setupKeyBindings() {
-        panelMain.setFocusable(true);
-        panelMain.requestFocusInWindow();
+        dungeonPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_W, 0), "moveUp");
+        dungeonPanel.getActionMap().put("moveUp", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (playerRow > 1) {
+                    playerRow--;
+                    movePlayer("up");
+                }
+            }
+        });
 
-        panelMain.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyPressed(java.awt.event.KeyEvent evt) {
-                int key = evt.getKeyCode();
-                if (key == KeyEvent.VK_UP || key == KeyEvent.VK_W) movePlayer(-1, 0, "up");
-                if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) movePlayer(1, 0, "down");
-                if (key == KeyEvent.VK_LEFT || key == KeyEvent.VK_A) movePlayer(0, -1, "left");
-                if (key == KeyEvent.VK_RIGHT || key == KeyEvent.VK_D) movePlayer(0, 1, "right");
+        dungeonPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_A, 0), "moveLeft");
+        dungeonPanel.getActionMap().put("moveLeft", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (playerCol > 1) {
+                    playerCol--;
+                    movePlayer("left");
+                }
+            }
+        });
+
+        dungeonPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "moveDown");
+        dungeonPanel.getActionMap().put("moveDown", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (playerRow < 8) {
+                    playerRow++;
+                    movePlayer("down");
+                }
+            }
+        });
+
+        dungeonPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_D, 0), "moveRight");
+        dungeonPanel.getActionMap().put("moveRight", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (playerCol < 8) {
+                    playerCol++;
+                    movePlayer("right");
+                }
             }
         });
     }
 
-    private void movePlayer(int dRow, int dCol, String direction) {
-        int newRow = playerRow + dRow;
-        int newCol = playerCol + dCol;
-
-        if (newRow < 0 || newRow >= 10 || newCol < 0 || newCol >= 10) return;
-
-        int newIndex = newRow * 10 + newCol;
-        JLabel newTile = (JLabel) dungeonPanel.getComponent(newIndex);
-        String type = (String) newTile.getClientProperty("type");
-
-        if (!"floor".equals(type)) return;
-
-        playerRow = newRow;
-        playerCol = newCol;
+    private void movePlayer(String direction) {
         placePlayer(playerRow, playerCol, direction);
+    }
+
+    public JPanel getPanelMain() {
+        return panelMain;
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Juego");
-            frame.setContentPane(new Juego().panelMain);
+            Juego juego = new Juego();
+            JFrame frame = new JFrame("Dungeon Game");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setResizable(false);
+            frame.getContentPane().add(juego.getPanelMain());
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
-
-            Image icon = Toolkit.getDefaultToolkit().getImage("src/images/politecnics.png");
-            frame.setIconImage(icon);
         });
     }
 }
