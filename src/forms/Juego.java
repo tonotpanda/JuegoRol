@@ -531,7 +531,6 @@ public class Juego {
             panelMain.remove(northComponent);
         }
 
-        infoPanel.removeAll();
         panelMain.add(createPlayerInfoPanel(), BorderLayout.NORTH);
         panelMain.revalidate();
         panelMain.repaint();
