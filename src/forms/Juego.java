@@ -14,6 +14,7 @@ import java.util.List;
 
 public class Juego {
     private JPanel panelMain;
+    private JPanel infoPanel;
     private JLabel messageLabel;
     private JPanel dungeonPanel;
 
@@ -43,6 +44,12 @@ public class Juego {
     private int playerHealth = 1;
     private int playerGold = 0;
     private List<String> playerItems = new ArrayList<>();
+
+    // Variables para rastrear los ítems en el mapa
+    private java.util.Map<Point, String> itemPositions = new java.util.HashMap<>();
+    private Point heartPosition;
+    private Point goldPosition;
+    private Point classItemPosition;
 
     public Juego() {
         panelMain = new JPanel(new BorderLayout());
@@ -107,15 +114,6 @@ public class Juego {
             this.playerName = name;
             messageLabel.setText("Personaje: " + name + " (" + role + ")");
 
-            // Inicializar items según la clase
-            if (role.equals("Guerrero")) {
-                playerItems.add("Espada");
-            } else if (role.equals("Mago")) {
-                playerItems.add("Poción");
-            } else if (role.equals("Curandero")) {
-                playerItems.add("Mitra");
-            }
-
             panelMain.removeAll();
             panelMain.revalidate();
             panelMain.repaint();
@@ -172,7 +170,7 @@ public class Juego {
     }
 
     private JPanel createPlayerInfoPanel() {
-        JPanel infoPanel = new JPanel(new GridLayout(1, 4));
+        infoPanel = new JPanel(new GridLayout(1, 4));
         infoPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
         infoPanel.setPreferredSize(new Dimension(1000, 60));
         infoPanel.setBackground(new Color(50, 50, 50));
@@ -199,16 +197,18 @@ public class Juego {
         JPanel itemsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
         itemsPanel.setOpaque(false);
 
-        // Añadir iconos de objetos según la clase
-        if (selectedRole.equals("Guerrero")) {
-            addItemIcon(itemsPanel, SWORD_ICON);
-        } else if (selectedRole.equals("Mago")) {
-            addItemIcon(itemsPanel, POTION_ICON);
-        } else if (selectedRole.equals("Curandero")) {
-            addItemIcon(itemsPanel, MITRA_ICON);
+        // Mostrar todos los objetos recolectados
+        for (String item : playerItems) {
+            String iconPath = "";
+            switch (item) {
+                case "sword": iconPath = SWORD_ICON; break;
+                case "potion": iconPath = POTION_ICON; break;
+                case "mitra": iconPath = MITRA_ICON; break;
+            }
+            addItemIcon(itemsPanel, iconPath);
         }
 
-        // Añadir iconos comunes
+        // Mostrar iconos de oro y corazón (aunque no sean objetos recolectados)
         addItemIcon(itemsPanel, DOLLAR_ICON);
         addItemIcon(itemsPanel, HEART_ICON);
 
@@ -242,17 +242,36 @@ public class Juego {
 
         Collections.shuffle(floorTiles);
 
+        // Colocar ítem de clase y guardar su posición
         if (selectedRole.equals("Guerrero") && !floorTiles.isEmpty()) {
-            placeItemOnTile(floorTiles.remove(0), SWORD_ICON);
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, SWORD_ICON);
+            itemPositions.put(classItemPosition, "sword");
         } else if (selectedRole.equals("Mago") && !floorTiles.isEmpty()) {
-            placeItemOnTile(floorTiles.remove(0), POTION_ICON);
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, POTION_ICON);
+            itemPositions.put(classItemPosition, "potion");
         } else if (selectedRole.equals("Curandero") && !floorTiles.isEmpty()) {
-            placeItemOnTile(floorTiles.remove(0), MITRA_ICON);
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, MITRA_ICON);
+            itemPositions.put(classItemPosition, "mitra");
         }
 
-        if (!floorTiles.isEmpty()) placeItemOnTile(floorTiles.remove(0), DOLLAR_ICON);
-        if (!floorTiles.isEmpty()) placeItemOnTile(floorTiles.remove(0), HEART_ICON);
+        // Colocar oro y guardar su posición
+        if (!floorTiles.isEmpty()) {
+            goldPosition = floorTiles.remove(0);
+            placeItemOnTile(goldPosition, DOLLAR_ICON);
+            itemPositions.put(goldPosition, "gold");
+        }
 
+        // Colocar corazón y guardar su posición
+        if (!floorTiles.isEmpty()) {
+            heartPosition = floorTiles.remove(0);
+            placeItemOnTile(heartPosition, HEART_ICON);
+            itemPositions.put(heartPosition, "heart");
+        }
+
+        // Posición inicial del jugador
         if (!floorTiles.isEmpty()) {
             Point start = floorTiles.remove(0);
             playerRow = start.x;
@@ -471,7 +490,51 @@ public class Juego {
     }
 
     private void movePlayer(String direction) {
+        Point newPosition = new Point(playerRow, playerCol);
+
+        // Verificar si el jugador está sobre un ítem
+        if (itemPositions.containsKey(newPosition)) {
+            String itemType = itemPositions.get(newPosition);
+
+            switch (itemType) {
+                case "heart":
+                    playerHealth++;
+                    itemPositions.remove(newPosition);
+                    restoreTile(dungeonPanel.getComponent(playerRow * 10 + playerCol));
+                    break;
+
+                case "gold":
+                    playerGold += 10;
+                    itemPositions.remove(newPosition);
+                    restoreTile(dungeonPanel.getComponent(playerRow * 10 + playerCol));
+                    break;
+
+                case "sword":
+                case "potion":
+                case "mitra":
+                    playerItems.add(itemType);
+                    itemPositions.remove(newPosition);
+                    restoreTile(dungeonPanel.getComponent(playerRow * 10 + playerCol));
+                    break;
+            }
+
+            // Actualizar panel de información
+            updateInfoPanel();
+        }
+
         placePlayer(playerRow, playerCol, direction);
+    }
+
+    private void updateInfoPanel() {
+        Component northComponent = ((BorderLayout)panelMain.getLayout()).getLayoutComponent(BorderLayout.NORTH);
+        if (northComponent != null) {
+            panelMain.remove(northComponent);
+        }
+
+        infoPanel.removeAll();
+        panelMain.add(createPlayerInfoPanel(), BorderLayout.NORTH);
+        panelMain.revalidate();
+        panelMain.repaint();
     }
 
     public JPanel getPanelMain() {
