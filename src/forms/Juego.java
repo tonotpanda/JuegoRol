@@ -40,6 +40,10 @@ public class Juego {
             "Curandero", "priest"
     );
 
+    private int playerHealth = 1;
+    private int playerGold = 0;
+    private List<String> playerItems = new ArrayList<>();
+
     public Juego() {
         panelMain = new JPanel(new BorderLayout());
         panelMain.setPreferredSize(new Dimension(1000, 800));
@@ -90,6 +94,7 @@ public class Juego {
 
     private void handleCharacterSelection(String role) {
         this.selectedRole = role;
+        playerItems.clear();
 
         messageLabel.setText("Has elegido: " + role);
 
@@ -101,6 +106,16 @@ public class Juego {
         if (name != null && !name.trim().isEmpty()) {
             this.playerName = name;
             messageLabel.setText("Personaje: " + name + " (" + role + ")");
+
+            // Inicializar items según la clase
+            if (role.equals("Guerrero")) {
+                playerItems.add("Espada");
+            } else if (role.equals("Mago")) {
+                playerItems.add("Poción");
+            } else if (role.equals("Curandero")) {
+                playerItems.add("Mitra");
+            }
+
             panelMain.removeAll();
             panelMain.revalidate();
             panelMain.repaint();
@@ -111,25 +126,33 @@ public class Juego {
     }
 
     private void loadDungeon() {
-        int numRows = 10, numCols = 10;
-        dungeonPanel = new JPanel(new GridLayout(numRows, numCols, 0, 0));
+        // Crear panel principal con BorderLayout
+        JPanel mainPanel = new JPanel(new BorderLayout());
+
+        // Panel de información del jugador
+        JPanel infoPanel = createPlayerInfoPanel();
+        mainPanel.add(infoPanel, BorderLayout.NORTH);
+
+        // Panel del dungeon
+        dungeonPanel = new JPanel(new GridLayout(10, 10, 0, 0));
         dungeonPanel.setBackground(Color.BLACK);
 
-        int tileWidth = 1000 / numCols;
-        int tileHeight = 800 / numRows;
+        // Resto del código para cargar el dungeon...
+        int tileWidth = 1000 / 10;
+        int tileHeight = (800 - infoPanel.getPreferredSize().height) / 10;
 
         ImageIcon wallIcon = new ImageIcon(TILE_WALL);
         ImageIcon floorIcon = new ImageIcon(TILE_FLOOR);
         Image scaledWallImage = wallIcon.getImage().getScaledInstance(tileWidth, tileHeight, Image.SCALE_SMOOTH);
         Image scaledFloorImage = floorIcon.getImage().getScaledInstance(tileWidth, tileHeight, Image.SCALE_SMOOTH);
 
-        for (int row = 0; row < numRows; row++) {
-            for (int col = 0; col < numCols; col++) {
+        for (int row = 0; row < 10; row++) {
+            for (int col = 0; col < 10; col++) {
                 JLabel tileLabel = new JLabel();
                 tileLabel.setHorizontalAlignment(SwingConstants.CENTER);
                 tileLabel.setVerticalAlignment(SwingConstants.CENTER);
 
-                boolean isBorder = row == 0 || row == numRows - 1 || col == 0 || col == numCols - 1;
+                boolean isBorder = row == 0 || row == 9 || col == 0 || col == 9;
                 ImageIcon icon = isBorder ? new ImageIcon(scaledWallImage) : new ImageIcon(scaledFloorImage);
                 tileLabel.setIcon(icon);
 
@@ -139,11 +162,70 @@ public class Juego {
             }
         }
 
-        panelMain.add(dungeonPanel, BorderLayout.CENTER);
+        mainPanel.add(dungeonPanel, BorderLayout.CENTER);
+        panelMain.add(mainPanel, BorderLayout.CENTER);
+
         panelMain.revalidate();
         panelMain.repaint();
 
-        loadItemsMap(numRows, numCols);
+        loadItemsMap(10, 10);
+    }
+
+    private JPanel createPlayerInfoPanel() {
+        JPanel infoPanel = new JPanel(new GridLayout(1, 4));
+        infoPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        infoPanel.setPreferredSize(new Dimension(1000, 60));
+        infoPanel.setBackground(new Color(50, 50, 50));
+
+        // Nombre del jugador
+        JLabel nameLabel = new JLabel("Nombre: " + playerName, SwingConstants.CENTER);
+        nameLabel.setForeground(Color.WHITE);
+        nameLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        infoPanel.add(nameLabel);
+
+        // Salud del jugador
+        JLabel healthLabel = new JLabel("Vidas: " + playerHealth, SwingConstants.CENTER);
+        healthLabel.setForeground(Color.WHITE);
+        healthLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        infoPanel.add(healthLabel);
+
+        // Oro del jugador
+        JLabel goldLabel = new JLabel("Oro: " + playerGold, SwingConstants.CENTER);
+        goldLabel.setForeground(Color.WHITE);
+        goldLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        infoPanel.add(goldLabel);
+
+        // Objetos del jugador (con iconos)
+        JPanel itemsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        itemsPanel.setOpaque(false);
+
+        // Añadir iconos de objetos según la clase
+        if (selectedRole.equals("Guerrero")) {
+            addItemIcon(itemsPanel, SWORD_ICON);
+        } else if (selectedRole.equals("Mago")) {
+            addItemIcon(itemsPanel, POTION_ICON);
+        } else if (selectedRole.equals("Curandero")) {
+            addItemIcon(itemsPanel, MITRA_ICON);
+        }
+
+        // Añadir iconos comunes
+        addItemIcon(itemsPanel, DOLLAR_ICON);
+        addItemIcon(itemsPanel, HEART_ICON);
+
+        infoPanel.add(itemsPanel);
+
+        return infoPanel;
+    }
+
+    private void addItemIcon(JPanel panel, String iconPath) {
+        try {
+            BufferedImage itemImage = ImageIO.read(new File(iconPath));
+            Image scaledItem = itemImage.getScaledInstance(30, 30, Image.SCALE_SMOOTH);
+            JLabel itemLabel = new JLabel(new ImageIcon(scaledItem));
+            panel.add(itemLabel);
+        } catch (IOException e) {
+            System.err.println("Error al cargar icono: " + iconPath);
+        }
     }
 
     private void loadItemsMap(int numRows, int numCols) {
