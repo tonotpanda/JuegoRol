@@ -4,6 +4,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -50,6 +51,16 @@ public class Juego {
     private Point heartPosition;
     private Point goldPosition;
     private Point classItemPosition;
+
+    // Enemigos
+    private Timer verticalEnemyTimer;
+    private Timer horizontalEnemyTimer;
+
+    private JLabel verticalEnemyLabel;
+    private JLabel horizontalEnemyLabel;
+
+    private int vStartRow, vCol;
+    private int hStartRow, hStartCol;
 
     public Juego() {
         panelMain = new JPanel(new BorderLayout());
@@ -129,7 +140,7 @@ public class Juego {
 
         // Panel de información del jugador
         JPanel infoPanel = createPlayerInfoPanel();
-        mainPanel.add(infoPanel, BorderLayout.NORTH);
+        mainPanel.add(createPlayerInfoPanel(), BorderLayout.NORTH);
 
         // Panel del dungeon
         dungeonPanel = new JPanel(new GridLayout(10, 10, 0, 0));
@@ -167,52 +178,245 @@ public class Juego {
         panelMain.repaint();
 
         loadItemsMap(10, 10);
+        loadEnemies();
     }
 
-    private JPanel createPlayerInfoPanel() {
-        infoPanel = new JPanel(new GridLayout(1, 4));
-        infoPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
-        infoPanel.setPreferredSize(new Dimension(1000, 60));
-        infoPanel.setBackground(new Color(50, 50, 50));
+    private void loadEnemies() {
+        // Enemigo vertical (no sobre el jugador)
+        do {
+            vStartRow = (int) (Math.random() * 6) + 2;
+            vCol = (int) (Math.random() * 6) + 2;
+        } while (vStartRow == playerRow && vCol == playerCol);
 
-        // Nombre del jugador
-        JLabel nameLabel = new JLabel("Nombre: " + playerName, SwingConstants.CENTER);
-        nameLabel.setForeground(Color.WHITE);
-        nameLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        infoPanel.add(nameLabel);
+        verticalEnemyLabel = createEnemyLabel("src/images/skeleton/skeleton_down.gif");
+        placeEnemyAt(verticalEnemyLabel, vStartRow, vCol);
 
-        // Salud del jugador
-        JLabel healthLabel = new JLabel("Vidas: " + playerHealth, SwingConstants.CENTER);
-        healthLabel.setForeground(Color.WHITE);
-        healthLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        infoPanel.add(healthLabel);
+        verticalEnemyTimer = new Timer(1000, new ActionListener() {
+            int direction = 1;
+            int currentRow = vStartRow;
 
-        // Oro del jugador
-        JLabel goldLabel = new JLabel("Oro: " + playerGold, SwingConstants.CENTER);
-        goldLabel.setForeground(Color.WHITE);
-        goldLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        infoPanel.add(goldLabel);
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeEnemyFromTile(currentRow, vCol);
+                currentRow += direction;
 
-        // Objetos del jugador (con iconos)
-        JPanel itemsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
-        itemsPanel.setOpaque(false);
+                if (currentRow <= 1 || currentRow >= 8) {
+                    direction *= -1;
+                }
 
-        // Mostrar todos los objetos recolectados
-        for (String item : playerItems) {
-            String iconPath = "";
-            switch (item) {
-                case "sword": iconPath = SWORD_ICON; break;
-                case "potion": iconPath = POTION_ICON; break;
-                case "mitra": iconPath = MITRA_ICON; break;
+                String gif = direction == 1 ? "skeleton_down.gif" : "skeleton_up.gif";
+                verticalEnemyLabel.setIcon(new ImageIcon("src/images/skeleton/" + gif));
+                placeEnemyAt(verticalEnemyLabel, currentRow, vCol);
+
+                checkCollision(currentRow, vCol);
             }
-            addItemIcon(itemsPanel, iconPath);
+        });
+        verticalEnemyTimer.start();
+
+        // Enemigo horizontal (no sobre el jugador)
+        do {
+            hStartRow = (int) (Math.random() * 6) + 2;
+            hStartCol = (int) (Math.random() * 6) + 2;
+        } while (hStartRow == playerRow && hStartCol == playerCol);
+
+        horizontalEnemyLabel = createEnemyLabel("src/images/skeleton/skeleton_right.gif");
+        placeEnemyAt(horizontalEnemyLabel, hStartRow, hStartCol);
+
+        horizontalEnemyTimer = new Timer(1000, new ActionListener() {
+            int direction = 1;
+            int currentCol = hStartCol;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeEnemyFromTile(hStartRow, currentCol);
+                currentCol += direction;
+
+                if (currentCol <= 1 || currentCol >= 8) {
+                    direction *= -1;
+                }
+
+                String gif = direction == 1 ? "skeleton_right.gif" : "skeleton_left.gif";
+                horizontalEnemyLabel.setIcon(new ImageIcon("src/images/skeleton/" + gif));
+                placeEnemyAt(horizontalEnemyLabel, hStartRow, currentCol);
+
+                checkCollision(hStartRow, currentCol);
+            }
+        });
+        horizontalEnemyTimer.start();
+    }
+
+    private void checkCollision(int enemyRow, int enemyCol) {
+        if (playerRow == enemyRow && playerCol == enemyCol) {
+            playerHealth--;
+            updateInfoPanel();
+            flashPlayer();
+
+            if (playerHealth <= 0) {
+                gameOver();
+            }
+        }
+    }
+
+    private void flashPlayer() {
+        Timer flashTimer = new Timer(200, new ActionListener() {
+            int flashes = 0;
+            boolean visible = true;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                playerLabel.setVisible(visible);
+                visible = !visible;
+                flashes++;
+
+                if (flashes >= 6) {
+                    ((Timer) e.getSource()).stop();
+                    playerLabel.setVisible(true);
+                }
+            }
+        });
+        flashTimer.start();
+    }
+
+    private void gameOver() {
+        verticalEnemyTimer.stop();
+        horizontalEnemyTimer.stop();
+        JOptionPane.showMessageDialog(panelMain, "¡Game Over!", "Fin del juego", JOptionPane.INFORMATION_MESSAGE);
+        System.exit(0);
+    }
+
+    private JLabel createEnemyLabel(String imagePath) {
+        ImageIcon icon = new ImageIcon(imagePath);
+        JLabel enemyLabel = new JLabel(icon);
+        enemyLabel.setBounds(0, 0, 100, 80);
+        return enemyLabel;
+    }
+
+
+    private void placeEnemyAt(JLabel enemy, int row, int col) {
+        int index = row * 10 + col;
+        Component tile = dungeonPanel.getComponent(index);
+
+        if (tile instanceof JLayeredPane) {
+            JLayeredPane pane = (JLayeredPane) tile;
+
+            // Evitar duplicados
+            for (Component comp : pane.getComponentsInLayer(JLayeredPane.PALETTE_LAYER)) {
+                if (comp == enemy) return;
+            }
+
+            if (enemy.getParent() != null) {
+                enemy.getParent().remove(enemy);
+            }
+
+            pane.add(enemy, JLayeredPane.PALETTE_LAYER);
+            pane.moveToFront(enemy);
+            pane.revalidate();
+            pane.repaint();
+        } else {
+            // Convertir tile a JLayeredPane
+            JLayeredPane layeredPane = new JLayeredPane();
+            layeredPane.setPreferredSize(new Dimension(100, 80));
+
+            JLabel bg = new JLabel(((JLabel)tile).getIcon());
+            bg.setBounds(0, 0, 100, 80);
+            layeredPane.add(bg, JLayeredPane.DEFAULT_LAYER);
+            layeredPane.add(enemy, JLayeredPane.PALETTE_LAYER);
+
+            dungeonPanel.remove(index);
+            dungeonPanel.add(layeredPane, index);
+            dungeonPanel.revalidate();
+            dungeonPanel.repaint();
+        }
+    }
+
+
+    private void removeEnemyFromTile(int row, int col) {
+        int index = row * 10 + col;
+        Component tile = dungeonPanel.getComponent(index);
+
+        if (tile instanceof JLayeredPane) {
+            JLayeredPane pane = (JLayeredPane) tile;
+
+            for (Component comp : pane.getComponentsInLayer(JLayeredPane.PALETTE_LAYER)) {
+                if (comp == verticalEnemyLabel || comp == horizontalEnemyLabel) {
+                    pane.remove(comp);
+                }
+            }
+
+            pane.revalidate();
+            pane.repaint();
+        }
+    }
+
+
+
+
+
+    private JLabel createEnemyAt(int row, int col, ImageIcon icon) {
+        int index = row * 10 + col;
+        Component tile = dungeonPanel.getComponent(index);
+        int width = tile.getWidth() > 0 ? tile.getWidth() : 100;
+        int height = tile.getHeight() > 0 ? tile.getHeight() : 80;
+
+        JLabel enemyLabel = new JLabel(icon);
+        enemyLabel.setBounds(0, 0, width, height);
+
+        if (tile instanceof JLayeredPane) {
+            ((JLayeredPane)tile).add(enemyLabel, JLayeredPane.PALETTE_LAYER);
+        } else {
+            JLayeredPane layeredPane = new JLayeredPane();
+            layeredPane.setPreferredSize(new Dimension(width, height));
+
+            JLabel bg = new JLabel(((JLabel)tile).getIcon());
+            bg.setBounds(0, 0, width, height);
+            layeredPane.add(bg, JLayeredPane.DEFAULT_LAYER);
+            layeredPane.add(enemyLabel, JLayeredPane.PALETTE_LAYER);
+
+            dungeonPanel.remove(index);
+            dungeonPanel.add(layeredPane, index);
         }
 
-        // Mostrar iconos de oro y corazón (aunque no sean objetos recolectados)
-        addItemIcon(itemsPanel, DOLLAR_ICON);
-        addItemIcon(itemsPanel, HEART_ICON);
+        return enemyLabel;
+    }
 
-        infoPanel.add(itemsPanel);
+
+
+
+
+
+    private JPanel createPlayerInfoPanel() {
+        if (infoPanel == null) {
+            infoPanel = new JPanel(new GridLayout(1, 4));
+            infoPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+            infoPanel.setPreferredSize(new Dimension(1000, 60));
+            infoPanel.setBackground(new Color(50, 50, 50));
+
+            // Nombre del jugador
+            JLabel nameLabel = new JLabel("Nombre: " + playerName, SwingConstants.CENTER);
+            nameLabel.setForeground(Color.WHITE);
+            nameLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            infoPanel.add(nameLabel);
+
+            // Salud del jugador
+            JLabel healthLabel = new JLabel("Vidas: " + playerHealth, SwingConstants.CENTER);
+            healthLabel.setForeground(Color.WHITE);
+            healthLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            infoPanel.add(healthLabel);
+
+            // Oro del jugador
+            JLabel goldLabel = new JLabel("Oro: " + playerGold, SwingConstants.CENTER);
+            goldLabel.setForeground(Color.WHITE);
+            goldLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            infoPanel.add(goldLabel);
+
+            // Panel de objetos
+            JPanel itemsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+            itemsPanel.setOpaque(false);
+            infoPanel.add(itemsPanel);
+        } else {
+            // Actualizar los valores si el panel ya existe
+            updateInfoPanel();
+        }
 
         return infoPanel;
     }
@@ -526,14 +730,41 @@ public class Juego {
     }
 
     private void updateInfoPanel() {
-        Component northComponent = ((BorderLayout)panelMain.getLayout()).getLayoutComponent(BorderLayout.NORTH);
-        if (northComponent != null) {
-            panelMain.remove(northComponent);
+        // Actualizar los componentes existentes en lugar de recrear el panel
+        for (Component comp : infoPanel.getComponents()) {
+            if (comp instanceof JLabel) {
+                JLabel label = (JLabel) comp;
+                if (label.getText().startsWith("Nombre: ")) {
+                    label.setText("Nombre: " + playerName);
+                } else if (label.getText().startsWith("Vidas: ")) {
+                    label.setText("Vidas: " + playerHealth);
+                } else if (label.getText().startsWith("Oro: ")) {
+                    label.setText("Oro: " + playerGold);
+                }
+            } else if (comp instanceof JPanel) {
+                // Actualizar el panel de ítems
+                JPanel itemsPanel = (JPanel) comp;
+                itemsPanel.removeAll();
+
+                // Mostrar todos los objetos recolectados
+                for (String item : playerItems) {
+                    String iconPath = "";
+                    switch (item) {
+                        case "sword": iconPath = SWORD_ICON; break;
+                        case "potion": iconPath = POTION_ICON; break;
+                        case "mitra": iconPath = MITRA_ICON; break;
+                    }
+                    addItemIcon(itemsPanel, iconPath);
+                }
+
+                // Mostrar iconos de oro y corazón (aunque no sean objetos recolectados)
+                addItemIcon(itemsPanel, DOLLAR_ICON);
+                addItemIcon(itemsPanel, HEART_ICON);
+            }
         }
 
-        panelMain.add(createPlayerInfoPanel(), BorderLayout.NORTH);
-        panelMain.revalidate();
-        panelMain.repaint();
+        infoPanel.revalidate();
+        infoPanel.repaint();
     }
 
     public JPanel getPanelMain() {
@@ -547,6 +778,7 @@ public class Juego {
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.getContentPane().add(juego.getPanelMain());
             frame.pack();
+            frame.setResizable(false);
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
         });
