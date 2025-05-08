@@ -2,6 +2,7 @@ package forms;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -9,10 +10,8 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public class Juego {
     private JPanel panelMain;
@@ -505,12 +504,32 @@ public class Juego {
         System.exit(0);  // Finaliza el juego
     }
 
+    // Método para colocar el ítem en la casilla del mapa
     private void placeItemOnTile(Point position, String itemIconPath) {
         try {
             int row = position.x;
             int col = position.y;
             int index = row * 10 + col;
-            JLabel tileLabel = (JLabel) dungeonPanel.getComponent(index);
+
+            Component tileComponent = dungeonPanel.getComponent(index);
+            JLabel tileLabel = null;
+
+            if (tileComponent instanceof JLabel) {
+                tileLabel = (JLabel) tileComponent;
+            } else if (tileComponent instanceof JLayeredPane) {
+                JLayeredPane pane = (JLayeredPane) tileComponent;
+                for (Component comp : pane.getComponentsInLayer(JLayeredPane.DEFAULT_LAYER)) {
+                    if (comp instanceof JLabel) {
+                        tileLabel = (JLabel) comp;
+                        break;
+                    }
+                }
+            }
+
+            if (tileLabel == null) {
+                System.err.println("No se encontró JLabel en la casilla " + index);
+                return;
+            }
 
             BufferedImage floorImage = ImageIO.read(new File(TILE_FLOOR));
             BufferedImage itemImage = ImageIO.read(new File(itemIconPath));
@@ -537,24 +556,14 @@ public class Juego {
 
             tileLabel.setIcon(new ImageIcon(combined));
 
-            // Verificar si es una moneda y agregar oro
-            if (itemIconPath.equals(DOLLAR_ICON)) {
-                collectGold();  // Sumar el oro
-            }
-
-            // Si es un objeto de protección (espada, poción, mitra), hacer que el jugador pueda recogerlo
-            if (itemIconPath.equals(SWORD_ICON) || itemIconPath.equals(POTION_ICON) || itemIconPath.equals(MITRA_ICON)) {
-                // Aquí definimos cómo manejar la recogida del objeto y la protección
-                collectItem(itemIconPath);  // Este método puede activar la protección
-            }
-
         } catch (IOException e) {
             System.err.println("Error al cargar imágenes: " + e.getMessage());
         }
     }
 
+    // Método para recoger un ítem
     private void collectItem(String itemIconPath) {
-        // Cuando el jugador recoge un objeto, activamos la protección dependiendo del objeto
+        // Activar protección dependiendo del ítem y del rol del jugador
         if (itemIconPath.equals(SWORD_ICON) && selectedRole.equals("Guerrero")) {
             hasProtection = true;
             currentItem = "sword";
@@ -566,13 +575,87 @@ public class Juego {
             currentItem = "mitra";
         }
 
-        // Eliminar el objeto del mapa
+        // Eliminar el ítem del mapa
         Point position = findItemPosition(itemIconPath);
         itemPositions.remove(position);  // Elimina el objeto recogido del mapa
 
-        // Actualizar la interfaz para reflejar el objeto recogido
+        // Actualizar la interfaz del jugador
         updateInfoPanel();
+
+        // Verificar si el jugador ha recogido todos los ítems específicos de su clase
+        checkAndRespawnItems();
     }
+
+    private void checkAndRespawnItems() {
+        boolean allItemsCollected = false;
+
+        if (selectedRole.equals("Guerrero") && playerItems.contains("sword")) {
+            allItemsCollected = true;
+        } else if (selectedRole.equals("Mago") && playerItems.contains("potion")) {
+            allItemsCollected = true;
+        } else if (selectedRole.equals("Curandero") && playerItems.contains("mitra")) {
+            allItemsCollected = true;
+        }
+
+        if (allItemsCollected && !hasProtection) {
+            respawnItems();  // Ahora respawnea ítems específicos y comunes
+            playerItems.clear();
+            System.out.println("Todos los ítems han sido recogidos, reapareciendo ítems...");
+        }
+    }
+
+
+    private void respawnItems() {
+        Random rand = new Random();
+        List<Point> availableTiles = new ArrayList<>();
+
+        for (int row = 1; row < 9; row++) {
+            for (int col = 1; col < 9; col++) {
+                Point pos = new Point(row, col);
+                if (!itemPositions.containsKey(pos) && !(playerRow == row && playerCol == col)) {
+                    availableTiles.add(pos);
+                }
+            }
+        }
+
+        if (availableTiles.size() < 3) return; // Necesitamos al menos 3 para clase, corazón y oro
+
+        Collections.shuffle(availableTiles);
+
+        // Ítem de clase
+        String classItem = "";
+        String classIcon = "";
+
+        switch (selectedRole) {
+            case "Guerrero":
+                classItem = "sword";
+                classIcon = SWORD_ICON;
+                break;
+            case "Mago":
+                classItem = "potion";
+                classIcon = POTION_ICON;
+                break;
+            case "Curandero":
+                classItem = "mitra";
+                classIcon = MITRA_ICON;
+                break;
+        }
+
+        Point classPos = availableTiles.remove(0);
+        itemPositions.put(classPos, classItem);
+        placeItemOnTile(classPos, classIcon);
+
+        // Vida
+        Point heartPos = availableTiles.remove(0);
+        itemPositions.put(heartPos, "heart");
+        placeItemOnTile(heartPos, HEART_ICON);
+
+        // Oro
+        Point goldPos = availableTiles.remove(0);
+        itemPositions.put(goldPos, "gold");
+        placeItemOnTile(goldPos, DOLLAR_ICON);
+    }
+
 
     // Método adicional para encontrar la posición del ítem en el mapa
     private Point findItemPosition(String itemIconPath) {
@@ -777,16 +860,15 @@ public class Juego {
                 case "sword":
                 case "potion":
                 case "mitra":
-                    // Solo activar protección si es el ítem de su clase
                     if ((selectedRole.equals("Guerrero") && itemType.equals("sword")) ||
                             (selectedRole.equals("Mago") && itemType.equals("potion")) ||
                             (selectedRole.equals("Curandero") && itemType.equals("mitra"))) {
-
                         currentItem = itemType;
                         activateProtection();
-                        showProtectionText = true; // Mostrar texto solo al recoger
+                        showProtectionText = true;
                     }
                     playerItems.add(itemType);
+                    checkAndRespawnItems(); // Verificar si hay que respawnear ítems
                     break;
             }
 
@@ -822,6 +904,7 @@ public class Juego {
                 player.setBackground(null);
                 player.isOpaque();
             }
+            checkAndRespawnItems(); // Verificar si hay que respawnear ítems
         });
         protectionTimer.setRepeats(false);
         protectionTimer.start();
