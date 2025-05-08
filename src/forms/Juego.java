@@ -19,6 +19,7 @@ public class Juego {
     private JPanel infoPanel;
     private JLabel messageLabel;
     private JPanel dungeonPanel;
+    private boolean showProtectionText = false;
 
     private String selectedRole;
     private String playerName;
@@ -376,10 +377,6 @@ public class Juego {
 
         return enemyLabel;
     }
-
-
-
-
 
 
     private JPanel createPlayerInfoPanel() {
@@ -787,6 +784,7 @@ public class Juego {
 
                         currentItem = itemType;
                         activateProtection();
+                        showProtectionText = true; // Mostrar texto solo al recoger
                     }
                     playerItems.add(itemType);
                     break;
@@ -799,6 +797,7 @@ public class Juego {
 
         placePlayer(playerRow, playerCol, direction);
     }
+
 
     private void activateProtection() {
         hasProtection = true;
@@ -829,6 +828,7 @@ public class Juego {
     }
 
 
+
     // Modificar updateInfoPanel para mostrar estado de protección
     private void updateInfoPanel() {
         for (Component comp : infoPanel.getComponents()) {
@@ -837,9 +837,9 @@ public class Juego {
                 if (label.getText().startsWith("Nombre: ")) {
                     label.setText("Nombre: " + playerName);
                 } else if (label.getText().startsWith("Vidas: ")) {
-                    String protectionText = hasProtection ? " (PROTEGIDO)" : "";
+                    String protectionText = showProtectionText ? " (PROTEGIDO)" : "";
                     label.setText("Vidas: " + playerHealth + protectionText);
-                    label.setForeground(hasProtection ? Color.CYAN : Color.WHITE);
+                    label.setForeground(showProtectionText ? Color.CYAN : Color.WHITE);
                 } else if (label.getText().startsWith("Oro: ")) {
                     label.setText("Oro: " + playerGold);
                 }
@@ -864,7 +864,11 @@ public class Juego {
 
         infoPanel.revalidate();
         infoPanel.repaint();
+
+        // Mostrar "(PROTEGIDO)" solo una vez
+        showProtectionText = false;
     }
+
 
 
     public JPanel getPanelMain() {
