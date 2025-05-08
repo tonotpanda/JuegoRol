@@ -603,32 +603,15 @@ public class Juego {
 
 
     private void checkAndRespawnItems() {
-        // Verifica si el jugador ha recogido todos los ítems importantes
-        boolean allItemsCollected = true;
-
-        // Verifica si tiene el ítem de clase de acuerdo con el rol
-        if (selectedRole.equals("Guerrero") && !playerItems.contains("sword")) {
-            allItemsCollected = false;
-        } else if (selectedRole.equals("Mago") && !playerItems.contains("potion")) {
-            allItemsCollected = false;
-        } else if (selectedRole.equals("Curandero") && !playerItems.contains("mitra")) {
-            allItemsCollected = false;
+        // Verificar si no quedan ítems en el mapa
+        if (itemPositions.isEmpty()) {
+            respawnItems();
+            System.out.println("Todos los ítems recogidos, reapareciendo nuevos ítems...");
         }
 
-        // Verifica si tiene los ítems comunes: oro y corazón
-        if (!playerItems.contains("gold") || !playerItems.contains("heart")) {
-            allItemsCollected = false;
-        }
-
+        // Verificar condición de victoria por oro
         if (playerGold == 50) {
             gameWon();
-        }
-
-        // Si todos los ítems han sido recogidos, respawnea los ítems
-        if (allItemsCollected) {
-            respawnItems();
-            playerItems.clear();  // Limpiar el inventario después de haber recogido todos los ítems
-            System.out.println("Todos los ítems han sido recogidos, reapareciendo ítems...");
         }
     }
 
@@ -637,10 +620,9 @@ public class Juego {
 
 
     private void respawnItems() {
-        Random rand = new Random();
         List<Point> availableTiles = new ArrayList<>();
 
-        // Recorre el mapa para encontrar casillas disponibles
+        // Encontrar todas las casillas disponibles (suelo sin ítems y no ocupadas por el jugador)
         for (int row = 1; row < 9; row++) {
             for (int col = 1; col < 9; col++) {
                 Point pos = new Point(row, col);
@@ -650,14 +632,14 @@ public class Juego {
             }
         }
 
-        if (availableTiles.size() < 3) return; // Necesitamos al menos 3 para clase, corazón y oro
+        // Si no hay suficientes casillas disponibles, no respawnear
+        if (availableTiles.size() < 3) return;
 
         Collections.shuffle(availableTiles);
 
-        // Ítem de clase
+        // Ítem de clase según el rol
         String classItem = "";
         String classIcon = "";
-
         switch (selectedRole) {
             case "Guerrero":
                 classItem = "sword";
@@ -673,22 +655,20 @@ public class Juego {
                 break;
         }
 
-        // Coloca el ítem de clase
+        // Colocar ítem de clase
         Point classPos = availableTiles.remove(0);
         itemPositions.put(classPos, classItem);
         placeItemOnTile(classPos, classIcon);
 
-        // Coloca el ítem de vida
+        // Colocar corazón
         Point heartPos = availableTiles.remove(0);
         itemPositions.put(heartPos, "heart");
         placeItemOnTile(heartPos, HEART_ICON);
 
-        // Coloca el ítem de oro
+        // Colocar oro
         Point goldPos = availableTiles.remove(0);
         itemPositions.put(goldPos, "gold");
         placeItemOnTile(goldPos, DOLLAR_ICON);
-
-
     }
 
 
@@ -905,14 +885,13 @@ public class Juego {
                             showProtectionText = true;
                         }
                     }
-                    playerItems.add(itemType);
-                    checkAndRespawnItems(); // Verificar si hay que respawnear ítems
                     break;
             }
 
             itemPositions.remove(newPosition);
             restoreTile(dungeonPanel.getComponent(playerRow * 10 + playerCol));
             updateInfoPanel();
+            checkAndRespawnItems(); // Verificar si hay que respawnear ítems
         }
 
         placePlayer(playerRow, playerCol, direction);
@@ -921,7 +900,6 @@ public class Juego {
 
 
     private void activateProtection() {
-        // Solo activar protección si no está activa
         if (!hasProtection) {
             hasProtection = true;
 
@@ -945,7 +923,6 @@ public class Juego {
                     player.setBackground(null);
                     player.isOpaque();
                 }
-                checkAndRespawnItems(); // Verificar si hay que respawnear ítems
             });
             protectionTimer.setRepeats(false);
             protectionTimer.start();
