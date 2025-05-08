@@ -876,10 +876,13 @@ public class Juego {
                 case "sword":
                 case "potion":
                 case "mitra":
+                    // Comprobar si el ítem coincide con el rol del jugador
                     if ((selectedRole.equals("Guerrero") && itemType.equals("sword")) ||
                             (selectedRole.equals("Mago") && itemType.equals("potion")) ||
                             (selectedRole.equals("Curandero") && itemType.equals("mitra"))) {
                         if (!hasProtection) {
+                            // Si el jugador no tiene protección, recoge el ítem y activa la protección
+                            playerItems.add(itemType); // Añadir el ítem al inventario del jugador
                             currentItem = itemType;
                             activateProtection();
                             showProtectionText = true;
@@ -888,14 +891,21 @@ public class Juego {
                     break;
             }
 
+            // Remover el ítem del mapa y restaurar el tile
             itemPositions.remove(newPosition);
             restoreTile(dungeonPanel.getComponent(playerRow * 10 + playerCol));
+
+            // Actualizar el panel de información
             updateInfoPanel();
-            checkAndRespawnItems(); // Verificar si hay que respawnear ítems
+
+            // Verificar si es necesario reaparecer ítems
+            checkAndRespawnItems();
         }
 
+        // Mover al jugador en la dirección indicada
         placePlayer(playerRow, playerCol, direction);
     }
+
 
 
 
@@ -936,7 +946,7 @@ public class Juego {
     private void updateInfoPanel() {
         boolean hasProtectionItem = false;
 
-        // Comprobar si el jugador tiene un ítem de protección en el inventario
+        // Verificar si el jugador tiene un ítem de protección en el inventario
         if (playerItems.contains("sword") || playerItems.contains("potion") || playerItems.contains("mitra")) {
             hasProtectionItem = true;
         }
@@ -983,6 +993,8 @@ public class Juego {
         // Restablecer la bandera de texto de protección solo una vez
         showProtectionText = false;
     }
+
+
 
 
 
