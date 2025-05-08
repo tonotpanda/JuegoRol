@@ -249,29 +249,41 @@ public class Juego {
         horizontalEnemyTimer.start();
     }
 
-    // Modificar el método checkCollision
     private void checkCollision(int enemyRow, int enemyCol) {
         if (playerRow == enemyRow && playerCol == enemyCol) {
+            if (hasProtection) {
+                hasProtection = false;
+                if (currentItem != null) {
+                    playerItems.remove(currentItem);  // Remover ítem del inventario
+                    currentItem = null;
+                }
+                updateInfoPanel(); // Refrescar la UI
+                checkAndRespawnItems(); // Hacer respawn del ítem de clase
+                return; // Salir del método, no perder vida
+            }
+            else {
                 playerHealth--;
                 updateInfoPanel();
 
                 if (playerHealth <= 0) {
                     gameOver();
-                } else {
-                    // Hacer que el enemigo desaparezca temporalmente
-                    removeEnemyFromTile(enemyRow, enemyCol);
-
-                    // Reaparecer después de 5 segundos
-                    new Timer(5000, e -> {
-                        if (enemyRow == vStartRow && enemyCol == vCol) {
-                            placeEnemyAt(verticalEnemyLabel, enemyRow, enemyCol);
-                        } else {
-                            placeEnemyAt(horizontalEnemyLabel, enemyRow, enemyCol);
-                        }
-                    }).start();
                 }
+            }
+
+            // Hacer que el enemigo desaparezca temporalmente
+            removeEnemyFromTile(enemyRow, enemyCol);
+
+            // Reaparecer después de 5 segundos
+            new Timer(5000, e -> {
+                if (enemyRow == vStartRow && enemyCol == vCol) {
+                    placeEnemyAt(verticalEnemyLabel, enemyRow, enemyCol);
+                } else {
+                    placeEnemyAt(horizontalEnemyLabel, enemyRow, enemyCol);
+                }
+            }).start();
         }
     }
+
 
 
 
@@ -561,54 +573,74 @@ public class Juego {
         }
     }
 
-    // Método para recoger un ítem
     private void collectItem(String itemIconPath) {
-        // Activar protección dependiendo del ítem y del rol del jugador
-        if (itemIconPath.equals(SWORD_ICON) && selectedRole.equals("Guerrero")) {
-            hasProtection = true;
-            currentItem = "sword";
-        } else if (itemIconPath.equals(POTION_ICON) && selectedRole.equals("Mago")) {
-            hasProtection = true;
-            currentItem = "potion";
-        } else if (itemIconPath.equals(MITRA_ICON) && selectedRole.equals("Curandero")) {
-            hasProtection = true;
-            currentItem = "mitra";
+        String collectedItem = "";
+
+        // Solo activar protección si no está activa y es el ítem de clase correspondiente
+        if ((itemIconPath.equals(SWORD_ICON) && selectedRole.equals("Guerrero") && !hasProtection) ||
+                (itemIconPath.equals(POTION_ICON) && selectedRole.equals("Mago") && !hasProtection) ||
+                (itemIconPath.equals(MITRA_ICON) && selectedRole.equals("Curandero") && !hasProtection)) {
+            activateProtection();
+        }
+
+        // Agregar el ítem al inventario solo si no está ya en el inventario
+        if (!collectedItem.isEmpty() && !playerItems.contains(collectedItem)) {
+            playerItems.add(collectedItem);
         }
 
         // Eliminar el ítem del mapa
         Point position = findItemPosition(itemIconPath);
-        itemPositions.remove(position);  // Elimina el objeto recogido del mapa
+        itemPositions.remove(position);
 
-        // Actualizar la interfaz del jugador
+        // Actualizar la interfaz
         updateInfoPanel();
 
-        // Verificar si el jugador ha recogido todos los ítems específicos de su clase
+        // Verificar si todos los ítems han sido recogidos y si es necesario respawnear los ítems
         checkAndRespawnItems();
     }
 
-    private void checkAndRespawnItems() {
-        boolean allItemsCollected = false;
 
-        if (selectedRole.equals("Guerrero") && playerItems.contains("sword")) {
-            allItemsCollected = true;
-        } else if (selectedRole.equals("Mago") && playerItems.contains("potion")) {
-            allItemsCollected = true;
-        } else if (selectedRole.equals("Curandero") && playerItems.contains("mitra")) {
-            allItemsCollected = true;
+
+
+    private void checkAndRespawnItems() {
+        // Verifica si el jugador ha recogido todos los ítems importantes
+        boolean allItemsCollected = true;
+
+        // Verifica si tiene el ítem de clase de acuerdo con el rol
+        if (selectedRole.equals("Guerrero") && !playerItems.contains("sword")) {
+            allItemsCollected = false;
+        } else if (selectedRole.equals("Mago") && !playerItems.contains("potion")) {
+            allItemsCollected = false;
+        } else if (selectedRole.equals("Curandero") && !playerItems.contains("mitra")) {
+            allItemsCollected = false;
         }
 
-        if (allItemsCollected && !hasProtection) {
-            respawnItems();  // Ahora respawnea ítems específicos y comunes
-            playerItems.clear();
+        // Verifica si tiene los ítems comunes: oro y corazón
+        if (!playerItems.contains("gold") || !playerItems.contains("heart")) {
+            allItemsCollected = false;
+        }
+
+        if (playerGold == 50) {
+            gameWon();
+        }
+
+        // Si todos los ítems han sido recogidos, respawnea los ítems
+        if (allItemsCollected) {
+            respawnItems();
+            playerItems.clear();  // Limpiar el inventario después de haber recogido todos los ítems
             System.out.println("Todos los ítems han sido recogidos, reapareciendo ítems...");
         }
     }
+
+
+
 
 
     private void respawnItems() {
         Random rand = new Random();
         List<Point> availableTiles = new ArrayList<>();
 
+        // Recorre el mapa para encontrar casillas disponibles
         for (int row = 1; row < 9; row++) {
             for (int col = 1; col < 9; col++) {
                 Point pos = new Point(row, col);
@@ -641,20 +673,24 @@ public class Juego {
                 break;
         }
 
+        // Coloca el ítem de clase
         Point classPos = availableTiles.remove(0);
         itemPositions.put(classPos, classItem);
         placeItemOnTile(classPos, classIcon);
 
-        // Vida
+        // Coloca el ítem de vida
         Point heartPos = availableTiles.remove(0);
         itemPositions.put(heartPos, "heart");
         placeItemOnTile(heartPos, HEART_ICON);
 
-        // Oro
+        // Coloca el ítem de oro
         Point goldPos = availableTiles.remove(0);
         itemPositions.put(goldPos, "gold");
         placeItemOnTile(goldPos, DOLLAR_ICON);
+
+
     }
+
 
 
     // Método adicional para encontrar la posición del ítem en el mapa
@@ -863,9 +899,11 @@ public class Juego {
                     if ((selectedRole.equals("Guerrero") && itemType.equals("sword")) ||
                             (selectedRole.equals("Mago") && itemType.equals("potion")) ||
                             (selectedRole.equals("Curandero") && itemType.equals("mitra"))) {
-                        currentItem = itemType;
-                        activateProtection();
-                        showProtectionText = true;
+                        if (!hasProtection) {
+                            currentItem = itemType;
+                            activateProtection();
+                            showProtectionText = true;
+                        }
                     }
                     playerItems.add(itemType);
                     checkAndRespawnItems(); // Verificar si hay que respawnear ítems
@@ -881,48 +919,62 @@ public class Juego {
     }
 
 
+
     private void activateProtection() {
-        hasProtection = true;
+        // Solo activar protección si no está activa
+        if (!hasProtection) {
+            hasProtection = true;
 
-        // Cambiar color del personaje para indicar protección
-        if (playerLabel instanceof JLayeredPane) {
-            Component player = ((JLayeredPane)playerLabel).getComponentsInLayer(JLayeredPane.PALETTE_LAYER)[0];
-            player.setBackground(new Color(100, 200, 255, 100));
-            player.isOpaque();
-        }
-
-        // Temporizador para desactivar la protección después de 10 segundos
-        if (protectionTimer != null) {
-            protectionTimer.stop();
-        }
-
-        protectionTimer = new Timer(10000, e -> {
-            hasProtection = false;
-            currentItem = "";
+            // Cambiar color del personaje para indicar protección
             if (playerLabel instanceof JLayeredPane) {
                 Component player = ((JLayeredPane)playerLabel).getComponentsInLayer(JLayeredPane.PALETTE_LAYER)[0];
-                player.setBackground(null);
+                player.setBackground(new Color(100, 200, 255, 100));
                 player.isOpaque();
             }
-            checkAndRespawnItems(); // Verificar si hay que respawnear ítems
-        });
-        protectionTimer.setRepeats(false);
-        protectionTimer.start();
+
+            // Temporizador para desactivar la protección después de 10 segundos
+            if (protectionTimer != null) {
+                protectionTimer.stop();
+            }
+
+            protectionTimer = new Timer(10000, e -> {
+                hasProtection = false;
+                currentItem = "";
+                if (playerLabel instanceof JLayeredPane) {
+                    Component player = ((JLayeredPane)playerLabel).getComponentsInLayer(JLayeredPane.PALETTE_LAYER)[0];
+                    player.setBackground(null);
+                    player.isOpaque();
+                }
+                checkAndRespawnItems(); // Verificar si hay que respawnear ítems
+            });
+            protectionTimer.setRepeats(false);
+            protectionTimer.start();
+        }
     }
 
 
 
-    // Modificar updateInfoPanel para mostrar estado de protección
+
+
     private void updateInfoPanel() {
+        boolean hasProtectionItem = false;
+
+        // Comprobar si el jugador tiene un ítem de protección en el inventario
+        if (playerItems.contains("sword") || playerItems.contains("potion") || playerItems.contains("mitra")) {
+            hasProtectionItem = true;
+        }
+
+        // Recorrer los componentes del panel de información
         for (Component comp : infoPanel.getComponents()) {
             if (comp instanceof JLabel) {
                 JLabel label = (JLabel) comp;
                 if (label.getText().startsWith("Nombre: ")) {
                     label.setText("Nombre: " + playerName);
                 } else if (label.getText().startsWith("Vidas: ")) {
-                    String protectionText = showProtectionText ? " (PROTEGIDO)" : "";
+                    // Mostrar "(PROTEGIDO)" si el jugador tiene protección
+                    String protectionText = hasProtectionItem ? " (PROTEGIDO)" : "";
                     label.setText("Vidas: " + playerHealth + protectionText);
-                    label.setForeground(showProtectionText ? Color.CYAN : Color.WHITE);
+                    label.setForeground(hasProtectionItem ? Color.CYAN : Color.WHITE);
                 } else if (label.getText().startsWith("Oro: ")) {
                     label.setText("Oro: " + playerGold);
                 }
@@ -930,6 +982,7 @@ public class Juego {
                 JPanel itemsPanel = (JPanel) comp;
                 itemsPanel.removeAll();
 
+                // Añadir los ítems al panel de inventario
                 for (String item : playerItems) {
                     String iconPath = "";
                     switch (item) {
@@ -940,17 +993,20 @@ public class Juego {
                     addItemIcon(itemsPanel, iconPath);
                 }
 
+                // Añadir ítems comunes (oro y corazón)
                 addItemIcon(itemsPanel, DOLLAR_ICON);
                 addItemIcon(itemsPanel, HEART_ICON);
             }
         }
 
+        // Refrescar la interfaz
         infoPanel.revalidate();
         infoPanel.repaint();
 
-        // Mostrar "(PROTEGIDO)" solo una vez
+        // Restablecer la bandera de texto de protección solo una vez
         showProtectionText = false;
     }
+
 
 
 
