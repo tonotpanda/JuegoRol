@@ -14,15 +14,13 @@ import java.util.*;
 import java.util.List;
 
 public class Juego {
+    /** JPNAELS **/
     private JPanel panelMain;
     private JPanel infoPanel;
     private JLabel messageLabel;
     private JPanel dungeonPanel;
-    private boolean showProtectionText = false;
 
-    private String selectedRole;
-    private String playerName;
-
+    /** IMAGES **/
     private static final String WARRIOR_IMAGE = "src/images/warrior/warriorPic.png";
     private static final String WIZARD_IMAGE = "src/images/wizard/wizardPic.png";
     private static final String PRIEST_IMAGE = "src/images/priest/priestPic.png";
@@ -34,53 +32,57 @@ public class Juego {
     private static final String POTION_ICON = "src/images/dungeon/potion.png";
     private static final String SWORD_ICON = "src/images/dungeon/sword.png";
 
+    /** PLAYER STATS **/
+    private String playerName;
+    private String selectedRole;
+    private int playerHealth = 1;
+    private int playerGold = 0;
+    private List<String> playerItems = new ArrayList<>();
+    private String currentItem = "";
+    private boolean hasProtection = false;
+    private Timer protectionTimer;
+    private boolean showProtectionText = false;
     private int playerRow, playerCol;
     private Component playerLabel;
 
+    /** PLAYER ROLES **/
     private final java.util.Map<String, String> roleFolderMap = java.util.Map.of(
             "Guerrero", "warrior",
             "Mago", "wizard",
             "Curandero", "priest"
     );
 
-    private int playerHealth = 1;
-    private int playerGold = 0;
-    private List<String> playerItems = new ArrayList<>();
-
-    // Variables para rastrear los ítems en el mapa
+    /** MAP **/
     private java.util.Map<Point, String> itemPositions = new java.util.HashMap<>();
     private Point heartPosition;
     private Point goldPosition;
     private Point classItemPosition;
 
-    // Enemigos
+    /** ENEMIES **/
     private Timer verticalEnemyTimer;
     private Timer horizontalEnemyTimer;
-
     private JLabel verticalEnemyLabel;
     private JLabel horizontalEnemyLabel;
-
     private int vStartRow, vCol;
     private int hStartRow, hStartCol;
-    private boolean hasProtection = false;
-    private Timer protectionTimer;
-    private String currentItem = "";
+
 
     public Juego() {
         panelMain = new JPanel(new BorderLayout());
         panelMain.setPreferredSize(new Dimension(1000, 800));
         panelMain.setBackground(new Color(245, 245, 245));
-
         initHeader();
         characterSelection();
     }
 
+    //* SELECT PLAYER ROL *//
+    // Agregar título arriba de la pantalla que pone "Elige tú personaje".
     private void initHeader() {
         JPanel headerPanel = new JPanel();
         headerPanel.setBackground(new Color(245, 245, 245));
         headerPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, Color.GRAY));
 
-        messageLabel = new JLabel("Elige tu personaje", SwingConstants.CENTER);
+        messageLabel = new JLabel("Elige tú personaje", SwingConstants.CENTER);
         messageLabel.setFont(new Font("Arial", Font.BOLD, 28));
         messageLabel.setForeground(new Color(60, 60, 60));
         headerPanel.add(messageLabel);
@@ -88,6 +90,7 @@ public class Juego {
         panelMain.add(headerPanel, BorderLayout.NORTH);
     }
 
+    // Carga las imagenes de los posibles roles y las agrega al centro.
     private void characterSelection() {
         JPanel charactersPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 40, 20));
         charactersPanel.setBackground(new Color(245, 245, 245));
@@ -99,6 +102,7 @@ public class Juego {
         panelMain.add(charactersPanel, BorderLayout.CENTER);
     }
 
+    // Crea botones con las imagenes pasada por parametros.
     private JButton createCharacterButton(String role, String imagePath) {
         JButton button = new JButton();
         button.setBackground(Color.WHITE);
@@ -114,6 +118,7 @@ public class Juego {
         return button;
     }
 
+    // Pasamos rol por parametros para saber que ha elegido y le pedimos un nombre a su personaje.
     private void handleCharacterSelection(String role) {
         this.selectedRole = role;
         playerItems.clear();
@@ -137,6 +142,8 @@ public class Juego {
             messageLabel.setText("Has elegido: " + role + " (sin nombre)");
         }
     }
+
+    //* LOAD MAP *//
 
     private void loadDungeon() {
         // Crear panel principal con BorderLayout
