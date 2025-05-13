@@ -145,6 +145,7 @@ public class Juego {
 
     //* LOAD MAP *//
 
+    // Cargamos el suelo y las paredes de la dungeon.
     private void loadDungeon() {
         // Crear panel principal con BorderLayout
         JPanel mainPanel = new JPanel(new BorderLayout());
