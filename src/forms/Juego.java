@@ -168,19 +168,25 @@ public class Juego {
 
         for (int row = 0; row < 10; row++) {
             for (int col = 0; col < 10; col++) {
+                // Crea un nuevo JLabel para representar una celda del dungeon
                 JLabel tileLabel = new JLabel();
                 tileLabel.setHorizontalAlignment(SwingConstants.CENTER);
                 tileLabel.setVerticalAlignment(SwingConstants.CENTER);
 
+                // Determina si la celda actual está en el borde (primera/última fila o columna)
                 boolean isBorder = row == 0 || row == 9 || col == 0 || col == 9;
+
+                // Si es un borde, usa la imagen del muro (wall), si no, usa la imagen del suelo (floor)
                 ImageIcon icon = isBorder ? new ImageIcon(scaledWallImage) : new ImageIcon(scaledFloorImage);
+                // Asigna la imagen seleccionada al JLabel
                 tileLabel.setIcon(icon);
 
+                // Guarda un valor personalizado en el JLabel para saber si es un muro o suelo
                 tileLabel.putClientProperty("type", isBorder ? "wall" : "floor");
-
                 dungeonPanel.add(tileLabel);
             }
         }
+
 
         mainPanel.add(dungeonPanel, BorderLayout.CENTER);
         panelMain.add(mainPanel, BorderLayout.CENTER);
