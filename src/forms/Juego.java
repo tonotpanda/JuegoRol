@@ -144,7 +144,6 @@ public class Juego {
     }
 
     //* LOAD MAP *//
-
     // Cargamos el suelo y las paredes de la dungeon.
     private void loadDungeon() {
         // Crear panel principal con BorderLayout
@@ -385,7 +384,6 @@ public class Juego {
     }
 
     /* ENEMIES */
-
     // Cargamos los enemigos por el mapa, que lo cargue aleatoriamente por el mapa y que no aparezca encima del jugador
     private void loadEnemies() {
         // Enemigo vertical (no sobre el jugador)
@@ -551,7 +549,6 @@ public class Juego {
     }
 
     /* GAME FINISHED */
-
     // Si el jugador pierde pasaria esto.
     private void gameOver() {
         // Detener los temporizadores y finalizar el juego si la vida llega a 0
@@ -564,7 +561,6 @@ public class Juego {
     }
 
     /* PLAYER INFO */
-
     // Creamos una interfaz para mostrar los datos del usuarios: Nombre, oro, vidas, items.
     private JPanel createPlayerInfoPanel() {
         if (infoPanel == null) {
@@ -655,7 +651,6 @@ public class Juego {
     }
 
     /* PLAYER LOGIC*/
-
     // Metodo para agregar la imagen del jugador al mapa
     private void placePlayer(int row, int col, String direction) {
         int index = row * 10 + col;
@@ -909,7 +904,6 @@ public class Juego {
     }
 
     /* GAME WON */
-
     // Metodo que se ejecuta cuando el jugador gana el juego.
     private void gameWon() {
         // Detener los temporizadores y detener el juego
