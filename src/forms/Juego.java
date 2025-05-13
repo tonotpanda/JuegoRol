@@ -192,6 +192,200 @@ public class Juego {
         loadEnemies();
     }
 
+    // Colocamos los items en el mapa cogiendo la fila y columna y dependiendo el rol carga un item o otro
+    private void loadItemsMap(int numRows, int numCols) {
+        List<Point> floorTiles = new ArrayList<>();
+
+        // Encontrar las losetas de suelo para colocar los items
+        for (int row = 1; row < numRows - 1; row++) {
+            for (int col = 1; col < numCols - 1; col++) {
+                JLabel tileLabel = (JLabel) dungeonPanel.getComponent(row * numCols + col);
+                if ("floor".equals(tileLabel.getClientProperty("type"))) {
+                    floorTiles.add(new Point(row, col));
+                }
+            }
+        }
+
+        Collections.shuffle(floorTiles);
+
+        // Colocar ítem de clase y guardar su posición
+        if (selectedRole.equals("Guerrero") && !floorTiles.isEmpty()) {
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, SWORD_ICON);
+            itemPositions.put(classItemPosition, "sword");
+        } else if (selectedRole.equals("Mago") && !floorTiles.isEmpty()) {
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, POTION_ICON);
+            itemPositions.put(classItemPosition, "potion");
+        } else if (selectedRole.equals("Curandero") && !floorTiles.isEmpty()) {
+            classItemPosition = floorTiles.remove(0);
+            placeItemOnTile(classItemPosition, MITRA_ICON);
+            itemPositions.put(classItemPosition, "mitra");
+        }
+
+        // Colocar oro y guardar su posición
+        if (!floorTiles.isEmpty()) {
+            goldPosition = floorTiles.remove(0);
+            placeItemOnTile(goldPosition, DOLLAR_ICON);
+            itemPositions.put(goldPosition, "gold");
+        }
+
+        // Colocar corazón y guardar su posición
+        if (!floorTiles.isEmpty()) {
+            heartPosition = floorTiles.remove(0);
+            placeItemOnTile(heartPosition, HEART_ICON);
+            itemPositions.put(heartPosition, "heart");
+        }
+
+        // Posición inicial del jugador
+        if (!floorTiles.isEmpty()) {
+            Point start = floorTiles.remove(0);
+            playerRow = start.x;
+            playerCol = start.y;
+            placePlayer(playerRow, playerCol, "down");
+            setupKeyBindings();
+        }
+    }
+
+    // Método para colocar el ítem en la casilla del mapa
+    private void placeItemOnTile(Point position, String itemIconPath) {
+        try {
+            int row = position.x;
+            int col = position.y;
+            int index = row * 10 + col;
+
+            Component tileComponent = dungeonPanel.getComponent(index);
+            JLabel tileLabel = null;
+
+            if (tileComponent instanceof JLabel) {
+                tileLabel = (JLabel) tileComponent;
+            } else if (tileComponent instanceof JLayeredPane) {
+                JLayeredPane pane = (JLayeredPane) tileComponent;
+                for (Component comp : pane.getComponentsInLayer(JLayeredPane.DEFAULT_LAYER)) {
+                    if (comp instanceof JLabel) {
+                        tileLabel = (JLabel) comp;
+                        break;
+                    }
+                }
+            }
+
+            if (tileLabel == null) {
+                System.err.println("No se encontró JLabel en la casilla " + index);
+                return;
+            }
+
+            BufferedImage floorImage = ImageIO.read(new File(TILE_FLOOR));
+            BufferedImage itemImage = ImageIO.read(new File(itemIconPath));
+
+            int width = tileLabel.getWidth() > 0 ? tileLabel.getWidth() : 100;
+            int height = tileLabel.getHeight() > 0 ? tileLabel.getHeight() : 80;
+
+            Image scaledFloor = floorImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+            int itemSize = Math.min(width, height) / 2;
+            Image scaledItem = itemImage.getScaledInstance(itemSize, itemSize, Image.SCALE_SMOOTH);
+
+            BufferedImage combined = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = combined.createGraphics();
+
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+
+            g.drawImage(scaledFloor, 0, 0, null);
+            int x = (width - itemSize) / 2;
+            int y = (height - itemSize) / 2;
+            g.drawImage(scaledItem, x, y, null);
+            g.dispose();
+
+            tileLabel.setIcon(new ImageIcon(combined));
+
+        } catch (IOException e) {
+            System.err.println("Error al cargar imágenes: " + e.getMessage());
+        }
+    }
+
+    // Añadimos los items al mapa
+    private void addItemIcon(JPanel panel, String iconPath) {
+        try {
+            BufferedImage itemImage = ImageIO.read(new File(iconPath));
+            Image scaledItem = itemImage.getScaledInstance(30, 30, Image.SCALE_SMOOTH);
+            JLabel itemLabel = new JLabel(new ImageIcon(scaledItem));
+            panel.add(itemLabel);
+        } catch (IOException e) {
+            System.err.println("Error al cargar icono: " + iconPath);
+        }
+    }
+
+    // Metodo para que los objetos vuelvan aparecer por el mapa y verifica si el jugador ha ganado
+    private void checkAndRespawnItems() {
+        // Verificar si no quedan ítems en el mapa
+        if (itemPositions.isEmpty()) {
+            respawnItems();
+            System.out.println("Todos los ítems recogidos, reapareciendo nuevos ítems...");
+        }
+
+        // Verificar condición de victoria por oro
+        if (playerGold == 50) {
+            gameWon();
+        }
+    }
+
+    // Verificamos que los objetos cargue de cada clase
+    private void respawnItems() {
+        List<Point> availableTiles = new ArrayList<>();
+
+        // Encontrar todas las casillas disponibles (suelo sin ítems y no ocupadas por el jugador)
+        for (int row = 1; row < 9; row++) {
+            for (int col = 1; col < 9; col++) {
+                Point pos = new Point(row, col);
+                if (!itemPositions.containsKey(pos) && !(playerRow == row && playerCol == col)) {
+                    availableTiles.add(pos);
+                }
+            }
+        }
+
+        // Si no hay suficientes casillas disponibles, no respawnear
+        if (availableTiles.size() < 3) return;
+
+        Collections.shuffle(availableTiles);
+
+        // Ítem de clase según el rol
+        String classItem = "";
+        String classIcon = "";
+        switch (selectedRole) {
+            case "Guerrero":
+                classItem = "sword";
+                classIcon = SWORD_ICON;
+                break;
+            case "Mago":
+                classItem = "potion";
+                classIcon = POTION_ICON;
+                break;
+            case "Curandero":
+                classItem = "mitra";
+                classIcon = MITRA_ICON;
+                break;
+        }
+
+        // Colocar ítem de clase
+        Point classPos = availableTiles.remove(0);
+        itemPositions.put(classPos, classItem);
+        placeItemOnTile(classPos, classIcon);
+
+        // Colocar corazón
+        Point heartPos = availableTiles.remove(0);
+        itemPositions.put(heartPos, "heart");
+        placeItemOnTile(heartPos, HEART_ICON);
+
+        // Colocar oro
+        Point goldPos = availableTiles.remove(0);
+        itemPositions.put(goldPos, "gold");
+        placeItemOnTile(goldPos, DOLLAR_ICON);
+    }
+
+    /* ENEMIES */
+
+    // Cargamos los enemigos por el mapa, que lo cargue aleatoriamente por el mapa y que no aparezca encima del jugador
     private void loadEnemies() {
         // Enemigo vertical (no sobre el jugador)
         do {
@@ -256,6 +450,15 @@ public class Juego {
         horizontalEnemyTimer.start();
     }
 
+    // Creamos las imagenes de los enemigos
+    private JLabel createEnemyLabel(String imagePath) {
+        ImageIcon icon = new ImageIcon(imagePath);
+        JLabel enemyLabel = new JLabel(icon);
+        enemyLabel.setBounds(0, 0, 100, 80);
+        return enemyLabel;
+    }
+
+    // Verificamos si el enemigo hace colisión con el jugador y si tiene protección
     private void checkCollision(int enemyRow, int enemyCol) {
         if (playerRow == enemyRow && playerCol == enemyCol) {
             if (hasProtection) {
@@ -291,27 +494,7 @@ public class Juego {
         }
     }
 
-
-
-
-    private void gameOver() {
-        // Detener los temporizadores y finalizar el juego si la vida llega a 0
-        verticalEnemyTimer.stop();
-        horizontalEnemyTimer.stop();
-
-        // Mostrar mensaje de fin de juego
-        JOptionPane.showMessageDialog(panelMain, "¡Game Over! Has perdido toda tu vida.", "Fin del Juego", JOptionPane.INFORMATION_MESSAGE);
-        System.exit(0);  // Finaliza el juego
-    }
-
-    private JLabel createEnemyLabel(String imagePath) {
-        ImageIcon icon = new ImageIcon(imagePath);
-        JLabel enemyLabel = new JLabel(icon);
-        enemyLabel.setBounds(0, 0, 100, 80);
-        return enemyLabel;
-    }
-
-
+    // Añadimos el enemigo al por el mapa y el pane (suelo) se repinta
     private void placeEnemyAt(JLabel enemy, int row, int col) {
         int index = row * 10 + col;
         Component tile = dungeonPanel.getComponent(index);
@@ -330,8 +513,6 @@ public class Juego {
 
             pane.add(enemy, JLayeredPane.PALETTE_LAYER);
             pane.moveToFront(enemy);
-            pane.revalidate();
-            pane.repaint();
         } else {
             // Convertir tile a JLayeredPane
             JLayeredPane layeredPane = new JLayeredPane();
@@ -349,7 +530,7 @@ public class Juego {
         }
     }
 
-
+    // Eliminar el enemigo para que visualmente quede bien, si no se enseña todo su recorrido
     private void removeEnemyFromTile(int row, int col) {
         int index = row * 10 + col;
         Component tile = dungeonPanel.getComponent(index);
@@ -368,35 +549,22 @@ public class Juego {
         }
     }
 
+    /* GAME FINISHED */
 
-    private JLabel createEnemyAt(int row, int col, ImageIcon icon) {
-        int index = row * 10 + col;
-        Component tile = dungeonPanel.getComponent(index);
-        int width = tile.getWidth() > 0 ? tile.getWidth() : 100;
-        int height = tile.getHeight() > 0 ? tile.getHeight() : 80;
+    // Si el jugador pierde pasaria esto.
+    private void gameOver() {
+        // Detener los temporizadores y finalizar el juego si la vida llega a 0
+        verticalEnemyTimer.stop();
+        horizontalEnemyTimer.stop();
 
-        JLabel enemyLabel = new JLabel(icon);
-        enemyLabel.setBounds(0, 0, width, height);
-
-        if (tile instanceof JLayeredPane) {
-            ((JLayeredPane)tile).add(enemyLabel, JLayeredPane.PALETTE_LAYER);
-        } else {
-            JLayeredPane layeredPane = new JLayeredPane();
-            layeredPane.setPreferredSize(new Dimension(width, height));
-
-            JLabel bg = new JLabel(((JLabel)tile).getIcon());
-            bg.setBounds(0, 0, width, height);
-            layeredPane.add(bg, JLayeredPane.DEFAULT_LAYER);
-            layeredPane.add(enemyLabel, JLayeredPane.PALETTE_LAYER);
-
-            dungeonPanel.remove(index);
-            dungeonPanel.add(layeredPane, index);
-        }
-
-        return enemyLabel;
+        // Mostrar mensaje de fin de juego
+        JOptionPane.showMessageDialog(panelMain, "¡Game Over! Has perdido toda tu vida.", "Fin del Juego", JOptionPane.INFORMATION_MESSAGE);
+        System.exit(0);  // Finaliza el juego
     }
 
+    /* PLAYER INFO */
 
+    // Creamos una interfaz para mostrar los datos del usuarios: Nombre, oro, vidas, items.
     private JPanel createPlayerInfoPanel() {
         if (infoPanel == null) {
             infoPanel = new JPanel(new GridLayout(1, 4));
@@ -430,270 +598,64 @@ public class Juego {
             // Actualizar los valores si el panel ya existe
             updateInfoPanel();
         }
-
         return infoPanel;
     }
 
-    private void addItemIcon(JPanel panel, String iconPath) {
-        try {
-            BufferedImage itemImage = ImageIO.read(new File(iconPath));
-            Image scaledItem = itemImage.getScaledInstance(30, 30, Image.SCALE_SMOOTH);
-            JLabel itemLabel = new JLabel(new ImageIcon(scaledItem));
-            panel.add(itemLabel);
-        } catch (IOException e) {
-            System.err.println("Error al cargar icono: " + iconPath);
+    // Actualizamos la interfaz del usuario
+    private void updateInfoPanel() {
+        boolean hasProtectionItem = false;
+
+        // Verificar si el jugador tiene un ítem de protección en el inventario
+        if (playerItems.contains("sword") || playerItems.contains("potion") || playerItems.contains("mitra")) {
+            hasProtectionItem = true;
         }
-    }
 
-    private void loadItemsMap(int numRows, int numCols) {
-        List<Point> floorTiles = new ArrayList<>();
-
-        // Encontrar las losetas de suelo para colocar los items
-        for (int row = 1; row < numRows - 1; row++) {
-            for (int col = 1; col < numCols - 1; col++) {
-                JLabel tileLabel = (JLabel) dungeonPanel.getComponent(row * numCols + col);
-                if ("floor".equals(tileLabel.getClientProperty("type"))) {
-                    floorTiles.add(new Point(row, col));
+        // Recorrer los componentes del panel de información
+        for (Component comp : infoPanel.getComponents()) {
+            if (comp instanceof JLabel) {
+                JLabel label = (JLabel) comp;
+                if (label.getText().startsWith("Nombre: ")) {
+                    label.setText("Nombre: " + playerName);
+                } else if (label.getText().startsWith("Vidas: ")) {
+                    // Mostrar "(PROTEGIDO)" si el jugador tiene protección
+                    String protectionText = hasProtectionItem ? " (PROTEGIDO)" : "";
+                    label.setText("Vidas: " + playerHealth + protectionText);
+                    label.setForeground(hasProtectionItem ? Color.CYAN : Color.WHITE);
+                } else if (label.getText().startsWith("Oro: ")) {
+                    label.setText("Oro: " + playerGold);
                 }
-            }
-        }
+            } else if (comp instanceof JPanel) {
+                JPanel itemsPanel = (JPanel) comp;
+                itemsPanel.removeAll();
 
-        Collections.shuffle(floorTiles);
-
-        // Colocar ítem de clase y guardar su posición
-        if (selectedRole.equals("Guerrero") && !floorTiles.isEmpty()) {
-            classItemPosition = floorTiles.remove(0);
-            placeItemOnTile(classItemPosition, SWORD_ICON);
-            itemPositions.put(classItemPosition, "sword");
-        } else if (selectedRole.equals("Mago") && !floorTiles.isEmpty()) {
-            classItemPosition = floorTiles.remove(0);
-            placeItemOnTile(classItemPosition, POTION_ICON);
-            itemPositions.put(classItemPosition, "potion");
-        } else if (selectedRole.equals("Curandero") && !floorTiles.isEmpty()) {
-            classItemPosition = floorTiles.remove(0);
-            placeItemOnTile(classItemPosition, MITRA_ICON);
-            itemPositions.put(classItemPosition, "mitra");
-        }
-
-        // Colocar oro y guardar su posición
-        if (!floorTiles.isEmpty()) {
-            goldPosition = floorTiles.remove(0);
-            placeItemOnTile(goldPosition, DOLLAR_ICON);
-            itemPositions.put(goldPosition, "gold");
-        }
-
-        // Colocar corazón y guardar su posición
-        if (!floorTiles.isEmpty()) {
-            heartPosition = floorTiles.remove(0);
-            placeItemOnTile(heartPosition, HEART_ICON);
-            itemPositions.put(heartPosition, "heart");
-        }
-
-        // Posición inicial del jugador
-        if (!floorTiles.isEmpty()) {
-            Point start = floorTiles.remove(0);
-            playerRow = start.x;
-            playerCol = start.y;
-            placePlayer(playerRow, playerCol, "down");
-            setupKeyBindings();
-        }
-    }
-
-    // Función que se llama cuando el jugador recoge una moneda
-    private void collectGold() {
-        // Sumar el oro cuando el jugador recoge una moneda
-        playerGold++;
-
-        // Actualizar la interfaz con la nueva cantidad de oro
-        updateInfoPanel();
-
-        // Comprobar si el jugador ha llegado a 50 monedas
-        if (playerGold >= 50) {
-            gameWon();  // El jugador ha ganado
-        }
-    }
-
-    private void gameWon() {
-        // Detener los temporizadores y detener el juego
-        verticalEnemyTimer.stop();
-        horizontalEnemyTimer.stop();
-
-        // Mostrar mensaje de victoria
-        JOptionPane.showMessageDialog(panelMain, "¡Has ganado! Has alcanzado 50 monedas.", "Victoria", JOptionPane.INFORMATION_MESSAGE);
-        System.exit(0);  // Finaliza el juego
-    }
-
-    // Método para colocar el ítem en la casilla del mapa
-    private void placeItemOnTile(Point position, String itemIconPath) {
-        try {
-            int row = position.x;
-            int col = position.y;
-            int index = row * 10 + col;
-
-            Component tileComponent = dungeonPanel.getComponent(index);
-            JLabel tileLabel = null;
-
-            if (tileComponent instanceof JLabel) {
-                tileLabel = (JLabel) tileComponent;
-            } else if (tileComponent instanceof JLayeredPane) {
-                JLayeredPane pane = (JLayeredPane) tileComponent;
-                for (Component comp : pane.getComponentsInLayer(JLayeredPane.DEFAULT_LAYER)) {
-                    if (comp instanceof JLabel) {
-                        tileLabel = (JLabel) comp;
-                        break;
+                // Añadir los ítems al panel de inventario
+                for (String item : playerItems) {
+                    String iconPath = "";
+                    switch (item) {
+                        case "sword": iconPath = SWORD_ICON; break;
+                        case "potion": iconPath = POTION_ICON; break;
+                        case "mitra": iconPath = MITRA_ICON; break;
                     }
+                    addItemIcon(itemsPanel, iconPath);
                 }
-            }
 
-            if (tileLabel == null) {
-                System.err.println("No se encontró JLabel en la casilla " + index);
-                return;
-            }
-
-            BufferedImage floorImage = ImageIO.read(new File(TILE_FLOOR));
-            BufferedImage itemImage = ImageIO.read(new File(itemIconPath));
-
-            int width = tileLabel.getWidth() > 0 ? tileLabel.getWidth() : 100;
-            int height = tileLabel.getHeight() > 0 ? tileLabel.getHeight() : 80;
-
-            Image scaledFloor = floorImage.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-            int itemSize = Math.min(width, height) / 2;
-            Image scaledItem = itemImage.getScaledInstance(itemSize, itemSize, Image.SCALE_SMOOTH);
-
-            BufferedImage combined = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = combined.createGraphics();
-
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-
-            g.drawImage(scaledFloor, 0, 0, null);
-            int x = (width - itemSize) / 2;
-            int y = (height - itemSize) / 2;
-            g.drawImage(scaledItem, x, y, null);
-            g.dispose();
-
-            tileLabel.setIcon(new ImageIcon(combined));
-
-        } catch (IOException e) {
-            System.err.println("Error al cargar imágenes: " + e.getMessage());
-        }
-    }
-
-    private void collectItem(String itemIconPath) {
-        String collectedItem = "";
-
-        // Solo activar protección si no está activa y es el ítem de clase correspondiente
-        if ((itemIconPath.equals(SWORD_ICON) && selectedRole.equals("Guerrero") && !hasProtection) ||
-                (itemIconPath.equals(POTION_ICON) && selectedRole.equals("Mago") && !hasProtection) ||
-                (itemIconPath.equals(MITRA_ICON) && selectedRole.equals("Curandero") && !hasProtection)) {
-            activateProtection();
-        }
-
-        // Agregar el ítem al inventario solo si no está ya en el inventario
-        if (!collectedItem.isEmpty() && !playerItems.contains(collectedItem)) {
-            playerItems.add(collectedItem);
-        }
-
-        // Eliminar el ítem del mapa
-        Point position = findItemPosition(itemIconPath);
-        itemPositions.remove(position);
-
-        // Actualizar la interfaz
-        updateInfoPanel();
-
-        // Verificar si todos los ítems han sido recogidos y si es necesario respawnear los ítems
-        checkAndRespawnItems();
-    }
-
-
-
-
-    private void checkAndRespawnItems() {
-        // Verificar si no quedan ítems en el mapa
-        if (itemPositions.isEmpty()) {
-            respawnItems();
-            System.out.println("Todos los ítems recogidos, reapareciendo nuevos ítems...");
-        }
-
-        // Verificar condición de victoria por oro
-        if (playerGold == 50) {
-            gameWon();
-        }
-    }
-
-
-
-
-
-    private void respawnItems() {
-        List<Point> availableTiles = new ArrayList<>();
-
-        // Encontrar todas las casillas disponibles (suelo sin ítems y no ocupadas por el jugador)
-        for (int row = 1; row < 9; row++) {
-            for (int col = 1; col < 9; col++) {
-                Point pos = new Point(row, col);
-                if (!itemPositions.containsKey(pos) && !(playerRow == row && playerCol == col)) {
-                    availableTiles.add(pos);
-                }
+                // Añadir ítems comunes (oro y corazón)
+                addItemIcon(itemsPanel, DOLLAR_ICON);
+                addItemIcon(itemsPanel, HEART_ICON);
             }
         }
 
-        // Si no hay suficientes casillas disponibles, no respawnear
-        if (availableTiles.size() < 3) return;
+        // Refrescar la interfaz
+        infoPanel.revalidate();
+        infoPanel.repaint();
 
-        Collections.shuffle(availableTiles);
-
-        // Ítem de clase según el rol
-        String classItem = "";
-        String classIcon = "";
-        switch (selectedRole) {
-            case "Guerrero":
-                classItem = "sword";
-                classIcon = SWORD_ICON;
-                break;
-            case "Mago":
-                classItem = "potion";
-                classIcon = POTION_ICON;
-                break;
-            case "Curandero":
-                classItem = "mitra";
-                classIcon = MITRA_ICON;
-                break;
-        }
-
-        // Colocar ítem de clase
-        Point classPos = availableTiles.remove(0);
-        itemPositions.put(classPos, classItem);
-        placeItemOnTile(classPos, classIcon);
-
-        // Colocar corazón
-        Point heartPos = availableTiles.remove(0);
-        itemPositions.put(heartPos, "heart");
-        placeItemOnTile(heartPos, HEART_ICON);
-
-        // Colocar oro
-        Point goldPos = availableTiles.remove(0);
-        itemPositions.put(goldPos, "gold");
-        placeItemOnTile(goldPos, DOLLAR_ICON);
+        // Restablecer la bandera de texto de protección solo una vez
+        showProtectionText = false;
     }
 
+    /* PLAYER LOGIC*/
 
-
-    // Método adicional para encontrar la posición del ítem en el mapa
-    private Point findItemPosition(String itemIconPath) {
-        for (Map.Entry<Point, String> entry : itemPositions.entrySet()) {
-            if (entry.getValue().equals(itemIconPath)) {
-                return entry.getKey();
-            }
-        }
-        return null; // Si no se encuentra el ítem
-    }
-
-
-
-
-
+    // Metodo para agregar la imagen del jugador al mapa
     private void placePlayer(int row, int col, String direction) {
         int index = row * 10 + col;
         Component tileComponent = dungeonPanel.getComponent(index);
@@ -789,7 +751,7 @@ public class Juego {
         dungeonPanel.repaint();
     }
 
-
+    // Cambia el suelo al suelo original
     private void restoreTile(Component tile) {
         if (tile instanceof JLayeredPane) {
             JLayeredPane pane = (JLayeredPane) tile;
@@ -820,6 +782,7 @@ public class Juego {
         }
     }
 
+    // Con W,A,S,D el jugador se mueve y con este metodo se especifica
     private void setupKeyBindings() {
         dungeonPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_W, 0), "moveUp");
         dungeonPanel.getActionMap().put("moveUp", new AbstractAction() {
@@ -913,9 +876,7 @@ public class Juego {
         placePlayer(playerRow, playerCol, direction);
     }
 
-
-
-
+    // Activamos la protección que hace que no le baje la vida si colisiona con un enemigo.
     private void activateProtection() {
         if (!hasProtection) {
             hasProtection = true;
@@ -946,65 +907,18 @@ public class Juego {
         }
     }
 
+    /* GAME WON */
 
+    // Metodo que se ejecuta cuando el jugador gana el juego.
+    private void gameWon() {
+        // Detener los temporizadores y detener el juego
+        verticalEnemyTimer.stop();
+        horizontalEnemyTimer.stop();
 
-
-
-    private void updateInfoPanel() {
-        boolean hasProtectionItem = false;
-
-        // Verificar si el jugador tiene un ítem de protección en el inventario
-        if (playerItems.contains("sword") || playerItems.contains("potion") || playerItems.contains("mitra")) {
-            hasProtectionItem = true;
-        }
-
-        // Recorrer los componentes del panel de información
-        for (Component comp : infoPanel.getComponents()) {
-            if (comp instanceof JLabel) {
-                JLabel label = (JLabel) comp;
-                if (label.getText().startsWith("Nombre: ")) {
-                    label.setText("Nombre: " + playerName);
-                } else if (label.getText().startsWith("Vidas: ")) {
-                    // Mostrar "(PROTEGIDO)" si el jugador tiene protección
-                    String protectionText = hasProtectionItem ? " (PROTEGIDO)" : "";
-                    label.setText("Vidas: " + playerHealth + protectionText);
-                    label.setForeground(hasProtectionItem ? Color.CYAN : Color.WHITE);
-                } else if (label.getText().startsWith("Oro: ")) {
-                    label.setText("Oro: " + playerGold);
-                }
-            } else if (comp instanceof JPanel) {
-                JPanel itemsPanel = (JPanel) comp;
-                itemsPanel.removeAll();
-
-                // Añadir los ítems al panel de inventario
-                for (String item : playerItems) {
-                    String iconPath = "";
-                    switch (item) {
-                        case "sword": iconPath = SWORD_ICON; break;
-                        case "potion": iconPath = POTION_ICON; break;
-                        case "mitra": iconPath = MITRA_ICON; break;
-                    }
-                    addItemIcon(itemsPanel, iconPath);
-                }
-
-                // Añadir ítems comunes (oro y corazón)
-                addItemIcon(itemsPanel, DOLLAR_ICON);
-                addItemIcon(itemsPanel, HEART_ICON);
-            }
-        }
-
-        // Refrescar la interfaz
-        infoPanel.revalidate();
-        infoPanel.repaint();
-
-        // Restablecer la bandera de texto de protección solo una vez
-        showProtectionText = false;
+        // Mostrar mensaje de victoria
+        JOptionPane.showMessageDialog(panelMain, "¡Has ganado! Has alcanzado 50 monedas.", "Victoria", JOptionPane.INFORMATION_MESSAGE);
+        System.exit(0);  // Finaliza el juego
     }
-
-
-
-
-
 
     public JPanel getPanelMain() {
         return panelMain;
